@@ -1,0 +1,252 @@
+
+qtmips_binrep:     file format elf32-bigmips
+
+
+Disassembly of section .text:
+
+00400018 <main>:
+
+/*
+ * The main entry into example program
+ */
+int main(int argc, char *argv[])
+{
+  400018:	27bdffe8 	addiu	$29,$29,-24
+                           allocate space on the stack for main() function
+                           stack frame
+  
+  40001c:	afbf0014 	sw	$31,20($29)
+                           save previous value of the return address register
+                           to the stack.
+
+ while (1) {
+     uint32_t rgb_knobs_value;
+     unsigned int uint_val;
+
+      rgb_knobs_value = *(volatile uint32_t*)(mem_base + SPILED_REG_KNOBS_8BIT_o);
+  400020:	8c04c124 	lw	$4,-16092($0)
+                           Read value from the address corresponding to the
+                           sum of "SPILED_REG_BASE" and "SPILED_REG_KNOBS_8BIT_o"
+                           peripheral register offset
+                           LW is instruction to load the word. Address is formed
+			   from the sum of register $0 (fixed zero) and -16092,
+			   which is represented in hexadecimal as 0xffffc124
+			   i.e., sum of 0xffffc100 and 0x24. The read value is
+			   stored in register $4.
+
+  400024:	00000000 	sll	$0,$0,0x0
+                           one NOP instruction to ensure that load finishes before
+                           the further value use.
+
+  400028:	00041027 	nor	$2,$0,$4
+                           Compute bit complement "~" of the value in the register
+			   $4 and store it into register $2
+
+     *(volatile uint32_t*)(mem_base + SPILED_REG_LED_LINE_o) = rgb_knobs_value;
+  40002c:	ac04c104 	sw	$4,-16124($0)
+                           Store RGB knobs values from register $4to the "LED"
+			   line register which is shown in binary decimal
+			   and hexadecimal on the QtMips target.
+			   Address 0xffffc104
+
+     *(volatile uint32_t*)(mem_base + SPILED_REG_LED_RGB1_o) = rgb_knobs_value;
+  400030:	ac04c110 	sw	$4,-16112($0)
+                           Store RGB knobs values to the corresponding components
+			   controlling a color/brightness of the RGB LED 1
+                           Address 0xffffc110
+
+
+     *(volatile uint32_t*)(mem_base + SPILED_REG_LED_RGB2_o) = ~rgb_knobs_value;
+  400034:	ac02c114 	sw	$2,-16108($0)
+                           Store complement of RGB knobs values to the corresponding
+			   components controlling a color/brightness of the RGB LED 2
+                           Address 0xffffc114
+
+     /* Assign value read from knobs to the basic signed and unsigned types */
+     uint_val = rgb_knobs_value;
+                           the read value resides in the register 4, which
+                           correspond to the first argument register a0
+
+     /* Print values */
+     serp_send_hex(uint_val);
+  400038:	0c100028 	jal	4000a0 <serp_send_hex>
+  40003c:	00000000 	sll	$0,$0,0x0
+                           call the function to send hexadecimal value to
+                           the serial port, one instruction after JAL
+                           is executed in its delay-slot, PC pointing
+                           after this instruction (0x400040) is stored
+                           to the register 31, return address register
+
+     serp_tx_byte('\n');
+  400040:	0c100020 	jal	400080 <serp_tx_byte>
+  400044:	2404000a 	addiu	$4,$0,10
+                           call routine to send new line character to the
+                           serial port. The ASCII value corresponding to
+                           '\n' is set to argument a0 register in delay slot
+                           of JAL. JAL is decoded and in parallel instruction
+                           addiu $4,$0,10 is executed then PC pointing to the address
+                           0x400048 after delay slot is stored to return address
+                           register and next instruction is fetch from the JAL
+                           instruction target address, start of the function
+                           serp_tx_byte
+
+  400048:	1000fff5 	beqz	$0,400020 <main+0x8>
+  40004c:	00000000 	sll	$0,$0,0x0
+                           branch back to the start of the loop reading value from
+                           the knobs
+
+
+00400050 <_start>:
+	la      $gp, _gp
+  400050:	3c1c0041 	lui	$28,0x41
+  400054:	279c90e0 	addiu	$28,$28,-28448
+                           Load global data base pointer to the global data
+                           base register 28 - gp.
+			   Symbol _gp is provided by linker.
+
+	addi    $a0, $zero, 0
+  400058:	20040000 	addi	$4,$0,0
+                           Set regist a0 (the first main function argument)
+			   to zero, argc is equal to zero.
+
+	addi    $a1, $zero, 0
+  40005c:	20050000 	addi	$5,$0,0
+                           Set regist a1 (the second main function argument)
+			   to zero, argv is equal to NULL.
+
+	jal     main
+  400060:	0c100006 	jal	400018 <main>
+	nop
+  400064:	00000000 	sll	$0,$0,0x0
+                           Call the main function. Return address is stored
+			   in the ra ($31) register.
+
+
+00400068 <quit>:
+quit:
+	addi    $a0, $zero, 0
+  400068:	20040000 	addi	$4,$0,0
+                           If the main functio returns, set exit value to 0
+
+	addi    $v0, $zero, 4001  /* SYS_exit */
+  40006c:	20020fa1 	addi	$2,$0,4001
+                           Set system call number to code representing exit()
+
+	syscall
+  400070:	0000000c 	syscall
+                           Call the system.
+
+00400074 <loop>:
+
+loop:	break
+  400074:	0000000d 	break
+                           If there is not a system try to stop the execution
+			   by invoking debugging exception
+
+        beq     $zero, $zero, loop
+  400078:	1000fffe 	beqz	$0,400074 <loop>
+	nop
+  40007c:	00000000 	sll	$0,$0,0x0
+                           If even this does not stop execution, command CPU
+			   to spin in busy loop.
+
+void serp_tx_byte(int data)
+{
+00400080 <serp_tx_byte>:
+  while (!(serp_read_reg(SERIAL_PORT_BASE, SERP_TX_ST_REG_o) &
+                SERP_TX_ST_REG_READY_m));
+  400080:	8c02c008 	lw	$2,-16376($0)
+  400084:	00000000 	sll	$0,$0,0x0
+                           Read serial port transmit status register,
+                           address 0xffffc008
+
+  while (!(serp_read_reg(SERIAL_PORT_BASE, SERP_TX_ST_REG_o) &
+  400088:	30420001 	andi	$2,$2,0x1
+  40008c:	1040fffc 	beqz	$2,400080 <serp_tx_byte>
+  400090:	00000000 	sll	$0,$0,0x0
+                           Wait again till UART is ready to accept
+			   character - bit 0 is not zero.
+                           NOP in the delayslot.
+
+  *(volatile uint32_t *)(base + reg) = val;
+  400094:	ac04c00c 	sw	$4,-16372($0)
+                           write value from register 4 (the first argument a0)
+                           to the address 0xffffc00c (SERP_TX_DATA_REG_o)
+                           serial port tx data register.
+}
+  400098:	03e00008 	jr	$31
+  40009c:	00000000 	sll	$0,$0,0x0
+                           jump/return back to continue in callee program
+                           address of the next fetch instruction is read
+                           from the return address register 32 ra
+                           
+void serp_send_hex(unsigned int val)
+{
+004000a0 <serp_send_hex>:
+  4000a0:	27bdffe8 	addiu	$29,$29,-24
+                           allocate space on the stack for the routine stack frame
+                                                      
+  4000a4:	00802825 	or	$5,$4,$0
+                           copy value of the fisrt argument regsiter 4 (a0)
+                           to the register 5
+
+  for (i = 8; i > 0; i--) {
+  4000a8:	24030008 	addiu	$3,$0,8
+                           set the value of the register 3 to the 8
+
+  4000ac:	afbf0014 	sw	$31,20($29)
+                           save previous value of the return address register
+                           to the stack.
+
+    char c = (val >> 28) & 0xf;
+  4000b0:	00051702 	srl	$2,$5,0x1c
+                           shift value in register 5 right by 28 bits and store
+                           result in the register 2
+
+  4000b4:	304600ff 	andi	$6,$2,0xff
+                           abundant operation to limit value range to the character
+                           type variable and store result in the register 6
+    if (c < 10 )
+  4000b8:	2c42000a 	sltiu	$2,$2,10
+                           set register 2 to one if the value is smaller than 10
+
+      c += 'A' - 10;
+  4000bc:	10400002 	beqz	$2,4000c8 <serp_send_hex+0x28>
+  4000c0:	24c40037 	addiu	$4,$6,55
+                           if value is larger or equal (register 2 is 0/false) then add
+                           value 55 ('A' - 10)..(0x41 - 0xa) = 0x37 = 55 to the register
+                           6 and store result in the register 4. This operation is
+                           executed even when the branch arm before else is executed,
+                           but result is immediately overwritten by next instruction
+      c += '0';
+  4000c4:	24c40030 	addiu	$4,$6,48
+                           add value 0x30 = 48 = '0' to the value in the register 6
+                           and store result in the register 4 - the fisrt argument a0
+  
+    serp_tx_byte(c);
+  4000c8:	0c100020 	jal	400080 <serp_tx_byte>
+  4000cc:	2463ffff 	addiu	$3,$3,-1
+                           call subroutine to send byte to the serial port
+                           decrement loop control variable (i) in delay-slot
+
+  for (i = 8; i > 0; i--) {
+  4000d0:	1460fff7 	bnez	$3,4000b0 <serp_send_hex+0x10>
+  4000d4:	00052900 	sll	$5,$5,0x4
+                           the final condition of for loop converted to do {} while()
+                           loop. If not all 8 character send loop again.
+                           Shift left value in the register 5 by 4 bit positions.
+                           The compiler does not store values of local variables to
+                           the stack even does not store values in caller save registers
+                           (which requires to save previous values to the function stack frame).
+                           Compiler can use this optimization because it knows registers usage
+                           of called function serp_tx_byte().
+  }
+  4000d8:	8fbf0014 	lw	$31,20($29)
+  4000dc:	00000000 	sll	$0,$0,0x0
+                           restore return address register value to that found at function
+                           start
+                           
+  4000e0:	03e00008 	jr	$31
+  4000e4:	27bd0018 	addiu	$29,$29,24
+                           return to the caller function. Instruction in jump register
+                           delay-slot is used to restore stack pointer/free function frame.

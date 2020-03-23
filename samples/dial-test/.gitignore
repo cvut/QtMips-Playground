@@ -1,0 +1,5 @@
+*.o
+*.srec
+depend
+dial-test
+
